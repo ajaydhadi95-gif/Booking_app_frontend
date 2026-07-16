@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Backend ka address (Humara SQLite server)
-const API_URL = 'http://13.207.200.59:31546/api';
+const API_URL = 'http://booking-backend-service:5000/api';
 
 // 1. AUTHENTICATION APIs
 export const registerUser = async (userData) => {
