@@ -2,48 +2,71 @@ pipeline {
     agent any
 
     environment {
-        DOCKER_IMAGE = "ajaydhadi95/booking-ui"
-        IMAGE_TAG = "latest"
-        CONTAINER_NAME = "booking-ui-container"
+        DOCKER_IMAGE   = "ajaydhadi95/booking-ui"
+        IMAGE_TAG      = "${env.BUILD_NUMBER}" 
+        KUBECONFIG     = "/etc/rancher/k3s/k3s.yaml"
     }
-}
 
-stages {
-
-    stage(checkout) {
-        steps {
-            git branch: 'main',
-            url: 'https://github.com/ajaydhadi95-gif/Booking_app_frontend.git'
+    stages {
+        stage('Checkout') {
+            steps {
+                git branch: 'main', url: 'https://github.com/ajaydhadi95-gif/Booking_app_frontend.git'
+            }
         }
-    }
 
-    stage(build) {
-        steps {
-            script {
-                sh 'docker build -t $DOCKER_IMAGE:$IMAGE_TAG .'
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    sh 'docker build -t $DOCKER_IMAGE:$IMAGE_TAG -t $DOCKER_IMAGE:latest .'
+                }
             }
         }
     
-    stage('Push Docker Image') {
-        steps {
-            withCredentials([usernamePassword(
-             credentialsId: 'dockerhub-creds',
-             usernameVariable: 'DOCKER_USER',
-             passwordVariable: 'DOCKER_PASS'
-            )]) {
-                sh '''
-                 echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-                 docker push $IMAGE_NAME:$IMAGE_TAG
+        stage('Push Docker Image') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'dockerhub-creds',
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
+                )]) {
+                    sh '''
+                    echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                    docker push $DOCKER_IMAGE:$IMAGE_TAG
+                    docker push $DOCKER_IMAGE:latest
                     '''
                 }
             }
         }
+
+        stage('Deploy to K3s') {
+            steps {
+                script {
+                    echo 'Applying Kubernetes manifests...'
+                   
+                    sh 'kubectl apply -f k8s/deployment.yaml'
+                    sh 'kubectl apply -f k8s/service.yaml'
+                    
+                    echo 'Triggering Kubernetes rolling update...'
+                   
+                    sh "kubectl set image deployment/booking-ui-deployment booking-ui=${DOCKER_IMAGE}:${IMAGE_TAG}"
+                    
+                    echo 'Checking rollout status...'
+                    sh 'kubectl rollout status deployment/booking-ui-deployment --timeout=60s'
+                }
+            }
+        }
+    }
+
     post {
+        always {
+            echo 'Cleaning up intermediate local images...'
+            sh "docker rmi ${DOCKER_IMAGE}:${IMAGE_TAG} || true"
+        }
         success {
-            echo 'Application deployed successfully!'
+            echo 'Application rolled out seamlessly to K3s cluster!'
         }
         failure {
-            echo 'Pipeline failed.'
+            echo 'Kubernetes deployment failed.'
         }
     }
 }

@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: booking-ui-deployment
+  labels:
+    app: booking-ui
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: booking-ui
+  template:
+    metadata:
+      labels:
+        app: booking-ui
+    spec:
+      containers:
+      - name: booking-ui
+        image: ajaydhadi95/booking-ui:${IMAGE_TAG}
+        ports:
+        - containerPort: 80
