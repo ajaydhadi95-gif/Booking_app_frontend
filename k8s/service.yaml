@@ -1,14 +1,14 @@
-apiVersion: apps/v1
-kind: Deployment
+apiVersion: v1
+kind: Service
 metadata:
-  name: booking-ui-deployment
+  name: booking-ui-service
+  labels:
+    app: booking-ui
 spec:
   type: NodePort
   selector:
     app: booking-ui
   ports:
-    - protocol: TCP
-      port: 80
+    - port: 80
       targetPort: 80
       nodePort: 30080
-      
